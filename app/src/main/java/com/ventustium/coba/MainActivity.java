@@ -7,7 +7,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -16,8 +15,18 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -39,6 +48,7 @@ public class MainActivity extends AppCompatActivity {
         textView = findViewById(R.id.Data);
 
         getData();
+        //disableSSLCertificateChecking();
 
         swipeRefreshLayout = findViewById(R.id.swipeRefresh);
         swipeRefreshLayout.setOnRefreshListener(this::getData);
@@ -46,7 +56,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void getData() {
         executor.execute(() -> {
-            String result = null;
             try {
                 getREST();
                 swipeRefreshLayout.setRefreshing(false);
@@ -57,7 +66,8 @@ public class MainActivity extends AppCompatActivity {
 
             handler.post(()-> {
                 if(id != null){
-                    textView.setText("ID: " + id + "\nName: " + name+ "\nstate: " +state);
+                    String result = "ID: " + id + "\nName: " + name+ "\nstate: " +state;
+                    textView.setText(result);
                 }
                 else{
                     textView.setText(error);
@@ -69,7 +79,7 @@ public class MainActivity extends AppCompatActivity {
     private void getREST() throws Exception{
         String url = "https://coba.petra.ac.id/laravel/public/api/v1/data/users";
         URL obj = new URL(url);
-        HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+        HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
         con.setRequestMethod("GET");
         con.setRequestProperty("User-Agent", "Mozilla/5.0");
         BufferedReader in = new BufferedReader(
@@ -87,5 +97,51 @@ public class MainActivity extends AppCompatActivity {
         id = arrObj.getString("id");
         name = arrObj.getString("name");
         state = arrObj.getString("state");
+    }
+
+    public void certInformation() throws Exception{
+        String aURL = "https://coba.petra.ac.id/laravel/public/api/v1/data/users";
+        URL destinationURL = new URL(aURL);
+        HttpsURLConnection conn = (HttpsURLConnection) destinationURL.openConnection();
+        conn.connect();
+        System.out.println("Certificate is:");
+        Certificate[] certs = conn.getServerCertificates();
+        for (Certificate cert : certs) {
+            System.out.println("Certificate is: " + cert);
+            if(cert instanceof X509Certificate) {
+                X509Certificate x = (X509Certificate ) cert;
+                System.out.println(x.getIssuerDN());
+            }
+        }
+    }
+
+    private static void disableSSLCertificateChecking() {
+        TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
+            public X509Certificate[] getAcceptedIssuers() {
+                return null;
+            }
+
+            @Override
+            public void checkClientTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
+                // Not implemented
+            }
+
+            @Override
+            public void checkServerTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
+                // Not implemented
+            }
+        } };
+
+        try {
+            SSLContext sc = SSLContext.getInstance("TLS");
+
+            sc.init(null, trustAllCerts, new java.security.SecureRandom());
+
+            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+        } catch (KeyManagementException e) {
+            e.printStackTrace();
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+        }
     }
 }
