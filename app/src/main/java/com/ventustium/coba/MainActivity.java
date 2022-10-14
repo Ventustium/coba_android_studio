@@ -8,6 +8,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.widget.TextView;
 
+import com.google.gson.JsonObject;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -20,6 +22,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -27,6 +30,12 @@ import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+
+import retrofit2.Call;
+import retrofit2.Callback;
+import retrofit2.Response;
+import retrofit2.Retrofit;
+import retrofit2.converter.gson.GsonConverterFactory;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -47,7 +56,24 @@ public class MainActivity extends AppCompatActivity {
 
         textView = findViewById(R.id.Data);
 
-        getData();
+        Retrofit retrofit = new Retrofit.Builder().baseUrl("https://coba.petra.ac.id").
+                addConverterFactory(GsonConverterFactory.create()).build();
+        GetService api = retrofit.create(GetService.class);
+        System.out.println("1");
+        api.getData().enqueue(new Callback<List<Long>>() {
+            @Override
+            public void onResponse(Call<List<Long>> call, Response<List<Long>> response) {
+                System.out.println("2");
+                String data = String.valueOf(response.body());
+                System.out.println(data);
+            }
+
+            @Override
+            public void onFailure(Call<List<Long>> call, Throwable t) {
+                System.out.println(t);
+            }
+        });
+//        getData();
         //disableSSLCertificateChecking();
 
         swipeRefreshLayout = findViewById(R.id.swipeRefresh);
@@ -55,93 +81,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void getData() {
-        executor.execute(() -> {
-            try {
-                getREST();
-                swipeRefreshLayout.setRefreshing(false);
-            } catch (Exception e){
-                error = e.toString();
-                swipeRefreshLayout.setRefreshing(false);
-            }
+        swipeRefreshLayout.setRefreshing(false);
 
-            handler.post(()-> {
-                if(id != null){
-                    String result = "ID: " + id + "\nName: " + name+ "\nstate: " +state;
-                    textView.setText(result);
-                }
-                else{
-                    textView.setText(error);
-                }
-            });
-        });
-    }
-
-    private void getREST() throws Exception{
-        String url = "https://coba.petra.ac.id/laravel/public/api/v1/data/users";
-        URL obj = new URL(url);
-        HttpsURLConnection con = (HttpsURLConnection) obj.openConnection();
-        con.setRequestMethod("GET");
-        con.setRequestProperty("User-Agent", "Mozilla/5.0");
-        BufferedReader in = new BufferedReader(
-                new InputStreamReader(con.getInputStream())
-        );
-        String input;
-        StringBuilder response = new StringBuilder();
-        while ((input = in.readLine()) != null) {
-            response.append(input);
-        }
-        in.close();
-
-        JSONArray myArray = new JSONArray(response.toString());
-        JSONObject arrObj = myArray.getJSONObject(0);
-        id = arrObj.getString("id");
-        name = arrObj.getString("name");
-        state = arrObj.getString("state");
-    }
-
-    public void certInformation() throws Exception{
-        String aURL = "https://coba.petra.ac.id/laravel/public/api/v1/data/users";
-        URL destinationURL = new URL(aURL);
-        HttpsURLConnection conn = (HttpsURLConnection) destinationURL.openConnection();
-        conn.connect();
-        System.out.println("Certificate is:");
-        Certificate[] certs = conn.getServerCertificates();
-        for (Certificate cert : certs) {
-            System.out.println("Certificate is: " + cert);
-            if(cert instanceof X509Certificate) {
-                X509Certificate x = (X509Certificate ) cert;
-                System.out.println(x.getIssuerDN());
-            }
-        }
-    }
-
-    private static void disableSSLCertificateChecking() {
-        TrustManager[] trustAllCerts = new TrustManager[] { new X509TrustManager() {
-            public X509Certificate[] getAcceptedIssuers() {
-                return null;
-            }
-
-            @Override
-            public void checkClientTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
-                // Not implemented
-            }
-
-            @Override
-            public void checkServerTrusted(X509Certificate[] arg0, String arg1) throws CertificateException {
-                // Not implemented
-            }
-        } };
-
-        try {
-            SSLContext sc = SSLContext.getInstance("TLS");
-
-            sc.init(null, trustAllCerts, new java.security.SecureRandom());
-
-            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-        } catch (KeyManagementException e) {
-            e.printStackTrace();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        }
     }
 }
